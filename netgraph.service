@@ -1,0 +1,12 @@
+[Unit] 
+Description=Netgraph Service
+Requires=influxdb.service
+
+[Service]
+Type=simple
+Restart=on-failure
+ExecStart=netgraph -c /etc/netgraph/config.ini
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+
+[Install]
+WantedBy=multi-user.target
