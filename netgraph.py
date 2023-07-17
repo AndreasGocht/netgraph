@@ -61,8 +61,8 @@ class NetGraphData(metaclass=Singleton):
         nethogs.nethogsmonitor_breakloop()
         self.nethogs_th.join()
 
-
-if __name__ == "__main__":
+def main():
+    #if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='NetGraph')
     parser.add_argument('-c', '--config')
     args = parser.parse_args()

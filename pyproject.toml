@@ -10,6 +10,9 @@ dependencies = [
     "influxdb-client"
 ]
 
+[project.scripts]
+netgraph = "netgraph:main"
+
 [tool.autopep8]
 aggressive = 2
 max-line-length = 120
