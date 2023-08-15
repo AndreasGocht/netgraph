@@ -3,6 +3,7 @@ import threading
 import signal
 import configparser
 import argparse
+import logging
 
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -37,18 +38,21 @@ class NetGraphData(metaclass=Singleton):
         return
 
     def callback(self, action: int, record: nethogs.NethogsMonitorRecord) -> None:
-        p = influxdb_client.Point("network_data").tag("name", record.name).field("sent_bytes", record.sent_bytes)
-        self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+        try:
+            p = influxdb_client.Point("network_data").tag("name", record.name).field("sent_bytes", record.sent_bytes)
+            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
-        p = influxdb_client.Point("network_data").tag("name", record.name).field("recv_bytes", record.recv_bytes)
-        self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+            p = influxdb_client.Point("network_data").tag("name", record.name).field("recv_bytes", record.recv_bytes)
+            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
-        p = influxdb_client.Point("network_data").tag("name", record.name).field("sent_kbs", record.sent_kbs)
-        self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+            p = influxdb_client.Point("network_data").tag("name", record.name).field("sent_kbs", record.sent_kbs)
+            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
-        p = influxdb_client.Point("network_data").tag("name", record.name).field("recv_kbs", record.recv_kbs)
-        self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
-
+            p = influxdb_client.Point("network_data").tag("name", record.name).field("recv_kbs", record.recv_kbs)
+            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+        except Exception as e:
+            logging.exception(e)
+            signal.raise_signal(signal.SIGTERM)
         return
 
     def start(self):
@@ -61,8 +65,9 @@ class NetGraphData(metaclass=Singleton):
         nethogs.nethogsmonitor_breakloop()
         self.nethogs_th.join()
 
+
 def main():
-    #if __name__ == "__main__":
+    # if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='NetGraph')
     parser.add_argument('-c', '--config')
     args = parser.parse_args()
@@ -76,7 +81,8 @@ def main():
     net_graph.start()
 
     def signal_handler(sig, frame):
-        net_graph.stop()
+        if sig == signal.SIGTERM or sig == signal.SIGINT:
+            net_graph.stop()
 
     signal.signal(signal.SIGINT, signal_handler)
-    signal.pause()
+    signal.sigwait([signal.SIGTERM, signal.SIGINT])
