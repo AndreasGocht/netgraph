@@ -50,6 +50,17 @@ class NetGraphData(metaclass=Singleton):
 
             p = influxdb_client.Point("network_data").tag("name", record.name).field("recv_kbs", record.recv_kbs)
             self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+
+            p = influxdb_client.Point("network_data").tag(
+                "name", record.name).field(
+                "sent_bytes_last", record.sent_bytes_last)
+            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+
+            p = influxdb_client.Point("network_data").tag(
+                "name", record.name).field(
+                "recv_bytes_last", record.recv_bytes_last)
+            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+
         except Exception as e:
             logging.exception(e)
             signal.raise_signal(signal.SIGTERM)
