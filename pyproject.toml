@@ -7,7 +7,7 @@ name = "netgraph"
 version = "0.0.1"
 dependencies = [
     "nethogs",
-    "influxdb-client"
+    "influxdb-client",
     "geoip2"
 ]
 
