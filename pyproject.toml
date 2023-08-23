@@ -8,6 +8,7 @@ version = "0.0.1"
 dependencies = [
     "nethogs",
     "influxdb-client"
+    "geoip2"
 ]
 
 [project.scripts]

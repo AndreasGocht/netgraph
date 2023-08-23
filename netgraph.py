@@ -4,6 +4,7 @@ import signal
 import configparser
 import argparse
 import logging
+import geo_data
 
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -19,12 +20,13 @@ class Singleton(type):
 
 
 class NetGraphData(metaclass=Singleton):
-    def __init__(self, influx_config, devices):
+    def __init__(self, influx_config, devices, geo_database):
         self.influx_url = influx_config["url"]
         self.influx_org = influx_config["org"]
         self.influx_bucket = influx_config["bucket"]
         self.pcap_to_ms = 100
         self.devices = devices
+        self.geo = geo_data.GeoData(geo_database)
 
         token = influx_config["token"]
 
@@ -38,26 +40,27 @@ class NetGraphData(metaclass=Singleton):
         return
 
     def callback(self, action: int, record: nethogs.NethogsMonitorRecord) -> None:
+        name = self.geo.check_and_translate(record.name)
         try:
-            p = influxdb_client.Point("network_data").tag("name", record.name).field("sent_bytes", record.sent_bytes)
+            p = influxdb_client.Point("network_data").tag("name", name).field("sent_bytes", record.sent_bytes)
             self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
-            p = influxdb_client.Point("network_data").tag("name", record.name).field("recv_bytes", record.recv_bytes)
+            p = influxdb_client.Point("network_data").tag("name", name).field("recv_bytes", record.recv_bytes)
             self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
-            p = influxdb_client.Point("network_data").tag("name", record.name).field("sent_kbs", record.sent_kbs)
+            p = influxdb_client.Point("network_data").tag("name", name).field("sent_kbs", record.sent_kbs)
             self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
-            p = influxdb_client.Point("network_data").tag("name", record.name).field("recv_kbs", record.recv_kbs)
+            p = influxdb_client.Point("network_data").tag("name", name).field("recv_kbs", record.recv_kbs)
             self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
             p = influxdb_client.Point("network_data").tag(
-                "name", record.name).field(
+                "name", name).field(
                 "sent_bytes_last", record.sent_bytes_last)
             self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
             p = influxdb_client.Point("network_data").tag(
-                "name", record.name).field(
+                "name", name).field(
                 "recv_bytes_last", record.recv_bytes_last)
             self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
@@ -87,8 +90,9 @@ def main():
     config.read(args.config)
 
     devices = [item.strip() for item in config["net_graph"]["interfaces"].split(",")]
+    geo_database = config["net_graph"]["geo_database"]
 
-    net_graph = NetGraphData(config["influx_db"], devices)
+    net_graph = NetGraphData(config["influx_db"], devices, geo_database)
     net_graph.start()
 
     def signal_handler(sig, frame):
