@@ -90,7 +90,7 @@ def main():
     config.read(args.config)
 
     devices = [item.strip() for item in config["net_graph"]["interfaces"].split(",")]
-    geo_database = config["net_graph"]["geo_database"]
+    geo_database = config["net_graph"].get("geo_database")
 
     net_graph = NetGraphData(config["influx_db"], devices, geo_database)
     net_graph.start()

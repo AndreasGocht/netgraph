@@ -34,9 +34,6 @@ class GeoData:
         else:
             return process_name
 
-    def __del__(self):
-        self.reader.close()
-
 
 if __name__ == "__main__":
     geo_data = GeoData("GeoLite2-Country_20230822/GeoLite2-Country.mmdb", ["144.76.107.201"])
