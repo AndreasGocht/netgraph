@@ -40,7 +40,11 @@ class NetGraphData(metaclass=Singleton):
         return
 
     def callback(self, action: int, record: nethogs.NethogsMonitorRecord) -> None:
-        name = self.geo.check_and_translate(record.name)
+        name = record.name
+
+        if record.pid == 0:
+            name = self.geo.check_and_translate(name)
+
         try:
             p = influxdb_client.Point("network_data").tag("name", name).field("sent_bytes", record.sent_bytes)
             self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
