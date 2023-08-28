@@ -31,7 +31,7 @@ class GeoData:
                         result.append("AddressNotFoundError")
                 else:
                     result.append("unkonw Error")
-                    logging.warn(f"Val in addr \"{addr}\"")
+                    logging.error(f"Val in addr \"{addr}\", Initial Name \"{process_name}\"")
             return f"{result[0]}-{result[1]}"
         else:
             return process_name

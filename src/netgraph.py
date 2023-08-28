@@ -96,7 +96,12 @@ def main():
     devices = [item.strip() for item in config["net_graph"]["interfaces"].split(",")]
     geo_database = config["net_graph"].get("geo_database")
 
+    logging.basicConfig(filename='example.log', encoding='tf-8', level=logging.INFO)
+
+    logging.info("Configuring netgraph")
     net_graph = NetGraphData(config["influx_db"], devices, geo_database)
+
+    logging.info("Starting netgraph")
     net_graph.start()
 
     def signal_handler(sig, frame):
