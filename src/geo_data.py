@@ -29,6 +29,8 @@ class GeoData:
                         result.append(response.country.name)
                     except geoip2.errors.AddressNotFoundError:
                         result.append("AddressNotFoundError")
+                elif addr is None:
+                    pass
                 else:
                     result.append("unkonw Error")
                     logging.error(f"Val in addr \"{addr}\", Initial Name \"{process_name}\"")
@@ -38,5 +40,5 @@ class GeoData:
 
 
 if __name__ == "__main__":
-    geo_data = GeoData("GeoLite2-Country_20230822/GeoLite2-Country.mmdb", ["144.76.107.201"])
-    print(geo_data.check_and_translate("144.76.107.201:22-180.101.88.241:63649"))
+    geo_data = GeoData("../tmp/GeoLite2-Country.mmdb", ["144.76.107.201"])
+    print(geo_data.check_and_translate("144.76.107.201:443-91.66.150.251:50016"))
