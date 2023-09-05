@@ -42,30 +42,20 @@ class NetGraphData(metaclass=Singleton):
     def callback(self, action: int, record: nethogs.NethogsMonitorRecord) -> None:
         name = record.name
 
-        if record.pid == 0:
+        if record.pid == 0 and "-" in name:
             name = self.geo.check_and_translate(name)
-
         try:
-            p = influxdb_client.Point("network_data").tag("name", name).field("sent_bytes", record.sent_bytes)
-            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
-
-            p = influxdb_client.Point("network_data").tag("name", name).field("recv_bytes", record.recv_bytes)
-            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
-
-            p = influxdb_client.Point("network_data").tag("name", name).field("sent_kbs", record.sent_kbs)
-            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
-
-            p = influxdb_client.Point("network_data").tag("name", name).field("recv_kbs", record.recv_kbs)
-            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
-
-            p = influxdb_client.Point("network_data").tag(
-                "name", name).field(
-                "sent_bytes_last", record.sent_bytes_last)
-            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
-
-            p = influxdb_client.Point("network_data").tag(
-                "name", name).field(
-                "recv_bytes_last", record.recv_bytes_last)
+            p = influxdb_client.Point("network_data")
+            p.tag("name", name)
+            p.tag("uid", record.uid)
+            p.tag("device_name", record.device_name)
+            p.field("pid", record.pid)
+            p.field("sent_bytes", record.sent_bytes)
+            p.field("recv_bytes", record.recv_bytes)
+            p.field("sent_kbs", record.sent_kbs)
+            p.field("recv_kbs", record.recv_kbs)
+            p.field("sent_bytes_last", record.sent_bytes_last)
+            p.field("recv_bytes_last", record.recv_bytes_last)
             self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
 
         except Exception as e:
