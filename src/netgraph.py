@@ -100,3 +100,7 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.sigwait([signal.SIGTERM, signal.SIGINT])
+
+
+if __name__ == '__main__':
+    main()
