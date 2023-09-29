@@ -29,25 +29,32 @@ class Influx:
     url: str
     org: str
     bucket: str
-    write_api: influxdb_client.WriteApi = influxdb_client.WriteApi()
+    write_api: influxdb_client.WriteApi = None
 
     def write(self, p: influxdb_client.Point):
-        self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+        self.write_api.write(bucket=self.bucket, org=self.org, record=p)
 
 
 class NetGraphPcap(regular_timer.RegularTimer):
     def __init__(self, influx: Influx, dt=datetime.timedelta(milliseconds=1000)):
         super().__init__(dt)
         self.influx = influx
+        self.last_reported = nethogs.nethogs_packet_stats()
 
     def update(self):
-        for elem in nethogs.nethogs_packet_stats():
+        current_stats = nethogs.nethogs_packet_stats()
+        for current, last in zip(current_stats, self.last_reported):
+            if current.device_name != last.device_name:
+                logging.error(f"devices do not match: {current.device_name} != {last.device_name}")
+                continue
+
             p = influxdb_client.Point("packet_stats")
-            p.tag("device_name", elem.devicename)
-            p.field("ps_recv", elem.ps_recv)
-            p.field("ps_drop", elem.ps_drop)
-            p.field("ps_ifdrop", elem.ps_ifdrop)
+            p.tag("device_name", current.device_name)
+            p.field("ps_recv", current.ps_recv - last.ps_recv)
+            p.field("ps_drop", current.ps_drop - last.ps_drop)
+            p.field("ps_ifdrop", current.ps_ifdrop - last.ps_ifdrop)
             self.influx.write(p)
+            self.last_reported = current_stats
 
 
 class NetGraphData(metaclass=Singleton):

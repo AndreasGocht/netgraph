@@ -6,7 +6,7 @@ class RegularTimer(threading.Thread):
     def __init__(self, dt=datetime.timedelta(milliseconds=1000)):
         self.cv = threading.Condition()
         self.running = True
-        self.dt = datetime.timedelta(dt)
+        self.dt = dt
         self.next_update = datetime.datetime.now() + self.dt
         super().__init__()
 
