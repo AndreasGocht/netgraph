@@ -4,7 +4,12 @@ import signal
 import configparser
 import argparse
 import logging
+import dataclasses
+import datetime
+
+
 import geo_data
+import regular_timer
 
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -19,23 +24,48 @@ class Singleton(type):
         return cls._instances[cls]
 
 
+@dataclasses.dataclass
+class Influx:
+    url: str
+    org: str
+    bucket: str
+    write_api: influxdb_client.WriteApi = influxdb_client.WriteApi()
+
+    def write(self, p: influxdb_client.Point):
+        self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+
+
+class NetGraphPcap(regular_timer.RegularTimer):
+    def __init__(self, influx: Influx, dt=datetime.timedelta(milliseconds=1000)):
+        super().__init__(dt)
+        self.influx = influx
+
+    def update(self):
+        for elem in nethogs.nethogs_packet_stats():
+            p = influxdb_client.Point("packet_stats")
+            p.tag("device_name", elem.devicename)
+            p.field("ps_recv", elem.ps_recv)
+            p.field("ps_drop", elem.ps_drop)
+            p.field("ps_ifdrop", elem.ps_ifdrop)
+            self.influx.write(p)
+
+
 class NetGraphData(metaclass=Singleton):
     def __init__(self, influx_config, devices, geo_database):
-        self.influx_url = influx_config["url"]
-        self.influx_org = influx_config["org"]
-        self.influx_bucket = influx_config["bucket"]
+        self.influx = Influx(influx_config["url"], influx_config["org"], influx_config["bucket"])
         self.pcap_to_ms = 100
         self.devices = devices
         self.geo = geo_data.GeoData(geo_database)
+        self.pcap_stats = NetGraphPcap(self.influx)
 
         token = influx_config["token"]
 
         self.client = influxdb_client.InfluxDBClient(
-            url=self.influx_url,
+            url=self.influx.url,
             token=token,
-            org=self.influx_org
+            org=self.influx.org
         )
-        self.write_api = self.client.write_api(write_options=SYNCHRONOUS)
+        self.influx.write_api = self.client.write_api(write_options=SYNCHRONOUS)
 
         return
 
@@ -56,7 +86,7 @@ class NetGraphData(metaclass=Singleton):
             p.field("recv_kbs", record.recv_kbs)
             p.field("sent_bytes_last", record.sent_bytes_last)
             p.field("recv_bytes_last", record.recv_bytes_last)
-            self.write_api.write(bucket=self.influx_bucket, org=self.influx_org, record=p)
+            self.influx.write(p)
 
         except Exception as e:
             logging.exception(e)
@@ -68,10 +98,12 @@ class NetGraphData(metaclass=Singleton):
             target=nethogs.nethogsmonitor_loop_devices, args=(
                 self.callback, "", self.devices, False, self.pcap_to_ms))
         self.nethogs_th.start()
+        self.pcap_stats.start()
 
     def stop(self):
         nethogs.nethogsmonitor_breakloop()
         self.nethogs_th.join()
+        self.pcap_stats.cancel()
 
 
 def main():
