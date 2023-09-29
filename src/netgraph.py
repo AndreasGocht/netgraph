@@ -44,17 +44,16 @@ class NetGraphPcap(regular_timer.RegularTimer):
     def update(self):
         current_stats = nethogs.nethogs_packet_stats()
         for current, last in zip(current_stats, self.last_reported):
-            if current.device_name != last.device_name:
+            if current.devicename != last.devicename:
                 logging.error(f"devices do not match: {current.device_name} != {last.device_name}")
                 continue
-
             p = influxdb_client.Point("packet_stats")
-            p.tag("device_name", current.device_name)
+            p.tag("device_name", current.devicename)
             p.field("ps_recv", current.ps_recv - last.ps_recv)
             p.field("ps_drop", current.ps_drop - last.ps_drop)
             p.field("ps_ifdrop", current.ps_ifdrop - last.ps_ifdrop)
             self.influx.write(p)
-            self.last_reported = current_stats
+        self.last_reported = current_stats
 
 
 class NetGraphData(metaclass=Singleton):
