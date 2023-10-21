@@ -52,7 +52,11 @@ class NetGraphPcap(regular_timer.RegularTimer):
             p.field("ps_recv", current.ps_recv - last.ps_recv)
             p.field("ps_drop", current.ps_drop - last.ps_drop)
             p.field("ps_ifdrop", current.ps_ifdrop - last.ps_ifdrop)
-            self.influx.write(p)
+            try:
+                self.influx.write(p)
+            except Exception as e:
+                logging.exception(e)
+
         self.last_reported = current_stats
 
 
@@ -80,23 +84,24 @@ class NetGraphData(metaclass=Singleton):
 
         if record.pid == 0 and "-" in name:
             name = self.geo.check_and_translate(name)
-        try:
-            p = influxdb_client.Point("network_data")
-            p.tag("name", name)
-            p.tag("uid", record.uid)
-            p.tag("device_name", record.device_name)
-            p.field("pid", record.pid)
-            p.field("sent_bytes", record.sent_bytes)
-            p.field("recv_bytes", record.recv_bytes)
-            p.field("sent_kbs", record.sent_kbs)
-            p.field("recv_kbs", record.recv_kbs)
-            p.field("sent_bytes_last", record.sent_bytes_last)
-            p.field("recv_bytes_last", record.recv_bytes_last)
-            self.influx.write(p)
 
+        p = influxdb_client.Point("network_data")
+        p.tag("name", name)
+        p.tag("uid", record.uid)
+        p.tag("device_name", record.device_name)
+        p.field("pid", record.pid)
+        p.field("sent_bytes", record.sent_bytes)
+        p.field("recv_bytes", record.recv_bytes)
+        p.field("sent_kbs", record.sent_kbs)
+        p.field("recv_kbs", record.recv_kbs)
+        p.field("sent_bytes_last", record.sent_bytes_last)
+        p.field("recv_bytes_last", record.recv_bytes_last)
+
+        try:
+            self.influx.write(p)
         except Exception as e:
             logging.exception(e)
-            signal.raise_signal(signal.SIGTERM)
+
         return
 
     def start(self):
