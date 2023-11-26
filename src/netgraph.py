@@ -77,6 +77,8 @@ class NetGraphData(metaclass=Singleton):
         )
         self.influx.write_api = self.client.write_api(write_options=SYNCHRONOUS)
 
+        self.data_to_wirte = []
+
         return
 
     def callback(self, action: int, record: nethogs.NethogsMonitorRecord) -> None:
@@ -104,7 +106,9 @@ class NetGraphData(metaclass=Singleton):
 
         return
 
+
     def start(self):
+        logging.info(f"Start Nethogs on the following devices: {self.devices}")
         self.nethogs_th = threading.Thread(
             target=nethogs.nethogsmonitor_loop_devices, args=(
                 self.callback, "", self.devices, False, self.pcap_to_ms))
@@ -118,18 +122,23 @@ class NetGraphData(metaclass=Singleton):
 
 
 def main():
-    # if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    
     parser = argparse.ArgumentParser(prog='NetGraph')
-    parser.add_argument('-c', '--config')
+    parser.add_argument('-c', '--config', required=True)
     args = parser.parse_args()
 
     config = configparser.ConfigParser()
-    config.read(args.config)
+    ret = config.read(args.config)
+    print(ret)
+    if len(ret) == 0:
+        raise RuntimeError("Can't find config file")
+    else:
+        logging.info("loaded config file")
 
     devices = [item.strip() for item in config["net_graph"]["interfaces"].split(",")]
     geo_database = config["net_graph"].get("geo_database")
 
-    logging.basicConfig(level=logging.INFO)
 
     logging.info("Configuring netgraph")
     net_graph = NetGraphData(config["influx_db"], devices, geo_database)

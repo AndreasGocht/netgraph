@@ -9,12 +9,19 @@ ip_reg = re.compile(f'{ipv4}|{ipv6}')
 
 
 class GeoData:
-    def __init__(self, database_location="./GeoLite2-Country.mmdb", local_ips=None):
-        self.reader = geoip2.database.Reader(database_location)
+    def __init__(self, database_location="./GeoLite2-Country.mmdb", local_ips=None):        
         if local_ips:
             self.local_ips = local_ips
         else:
             self.local_ips = subprocess.check_output(['hostname', '--all-ip-addresses']).decode().split()
+        
+        try:
+            self.reader = geoip2.database.Reader(database_location)
+            self.enable_geodatabase = True
+        except FileNotFoundError:
+            self.enable_geodatabase = False
+            logging.error("Geo Database not found, running without")
+
 
     def check_and_translate(self, process_name):
         result = []
@@ -23,12 +30,14 @@ class GeoData:
             for addr in ip_addresses.groups():
                 if addr in self.local_ips:
                     result.append("local")
-                elif addr:
+                elif addr and self.enable_geodatabase:
                     try:
                         response = self.reader.country(addr)
                         result.append(response.country.name)
                     except geoip2.errors.AddressNotFoundError:
                         result.append("AddressNotFoundError")
+                elif addr and not self.enable_geodatabase:
+                    result = addr
                 elif addr is None:
                     pass
                 else:
