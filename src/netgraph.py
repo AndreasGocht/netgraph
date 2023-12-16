@@ -130,7 +130,6 @@ def main():
 
     config = configparser.ConfigParser()
     ret = config.read(args.config)
-    print(ret)
     if len(ret) == 0:
         raise RuntimeError("Can't find config file")
     else:
