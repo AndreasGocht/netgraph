@@ -13,6 +13,7 @@ import regular_timer
 
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
+from urllib3.exceptions import NewConnectionError
 
 
 class Singleton(type):
@@ -40,9 +41,13 @@ class NetGraphPcap(regular_timer.RegularTimer):
         super().__init__(dt)
         self.influx = influx
         self.last_reported = nethogs.nethogs_packet_stats()
+        self.data_write_buffer = []
 
-    def update(self):
+
+    def collect_data(self):
         current_stats = nethogs.nethogs_packet_stats()
+        time = datetime.datetime.utcnow()
+        data_to_write = []
         for current, last in zip(current_stats, self.last_reported):
             if current.devicename != last.devicename:
                 logging.error(f"devices do not match: {current.device_name} != {last.device_name}")
@@ -52,16 +57,37 @@ class NetGraphPcap(regular_timer.RegularTimer):
             p.field("ps_recv", current.ps_recv - last.ps_recv)
             p.field("ps_drop", current.ps_drop - last.ps_drop)
             p.field("ps_ifdrop", current.ps_ifdrop - last.ps_ifdrop)
-            try:
-                self.influx.write(p)
-            except Exception as e:
-                logging.exception(e)
-
+            p.time(time)
+            data_to_write.append(p)
         self.last_reported = current_stats
+        return data_to_write
+
+    def send_data(self):
+        while len(self.data_write_buffer) > 0:
+            data = self.data_write_buffer.pop()
+            try:
+                self.influx.write(data)
+            except NewConnectionError as e:
+                self.data_write_buffer.append(data)
+                logging.error("Can't reach Influx, try again later")
+                break
+
+    def update(self):
+        try:
+            data_to_write = self.collect_data()
+            self.data_write_buffer.append(data_to_write)
+            self.data_to_wirte = []
+            self.send_data()
+        except Exception as e:
+            logging.exception("Some Exception occured")
+
+        
 
 
-class NetGraphData(metaclass=Singleton):
-    def __init__(self, influx_config, devices, geo_database):
+class NetGraphData(regular_timer.RegularTimer, metaclass=Singleton):
+    def __init__(self, influx_config, devices, geo_database, dt=datetime.timedelta(milliseconds=1000)):
+        super().__init__(dt)        
+
         self.influx = Influx(influx_config["url"], influx_config["org"], influx_config["bucket"])
         self.pcap_to_ms = 100
         self.devices = devices
@@ -75,13 +101,15 @@ class NetGraphData(metaclass=Singleton):
             token=token,
             org=self.influx.org
         )
-        self.influx.write_api = self.client.write_api(write_options=SYNCHRONOUS)
 
+        self.influx.write_api = self.client.write_api(write_options=SYNCHRONOUS)
+        self.data_write_buffer = []
+
+        self.lock = threading.RLock()
         self.data_to_wirte = []
 
-        return
-
     def callback(self, action: int, record: nethogs.NethogsMonitorRecord) -> None:
+        time = datetime.datetime.utcnow()
         name = record.name
 
         if record.pid == 0 and "-" in name:
@@ -98,13 +126,11 @@ class NetGraphData(metaclass=Singleton):
         p.field("recv_kbs", record.recv_kbs)
         p.field("sent_bytes_last", record.sent_bytes_last)
         p.field("recv_bytes_last", record.recv_bytes_last)
+        p.time(time)
 
-        try:
-            self.influx.write(p)
-        except Exception as e:
-            logging.exception(e)
+        with self.lock:
+            self.data_to_wirte.append(p)
 
-        return
 
 
     def start(self):
@@ -114,11 +140,35 @@ class NetGraphData(metaclass=Singleton):
                 self.callback, "", self.devices, False, self.pcap_to_ms))
         self.nethogs_th.start()
         self.pcap_stats.start()
+        super().start()
 
     def stop(self):
         nethogs.nethogsmonitor_breakloop()
         self.nethogs_th.join()
         self.pcap_stats.cancel()
+        self.cancel()
+
+    def send_data(self):
+        send_packets = 0
+        while len(self.data_write_buffer) > 0:
+            data = self.data_write_buffer.pop()
+            try:
+                self.influx.write(data)
+                send_packets += 1
+            except NewConnectionError as e:
+                self.data_write_buffer.append(data)
+                logging.error("Can't reach Influx, try again later")
+                break
+        logging.debug(f"send {send_packets} data packets")
+    
+    def update(self):
+        try:
+            with self.lock:
+                self.data_write_buffer.append(self.data_to_wirte)
+                self.data_to_wirte = []
+            self.send_data()
+        except Exception as e:
+            logging.exception("Some Exception occured")
 
 
 def main():
@@ -130,6 +180,7 @@ def main():
 
     config = configparser.ConfigParser()
     ret = config.read(args.config)
+    
     if len(ret) == 0:
         raise RuntimeError("Can't find config file")
     else:
