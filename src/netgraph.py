@@ -59,7 +59,7 @@ class Influx(threading.Thread):
                 if len(self.write_buffer) >= self.write_buffer_size:
                     try:
                         self.write_api.write(bucket=self.bucket, org=self.org, record=self.write_buffer)
-                        self.data_write_buffer = []
+                        self.write_buffer = []
                         logging.debug(f"send to Influx")
                     except NewConnectionError as e:
                         logging.error("Can't reach Influx, try again later")
