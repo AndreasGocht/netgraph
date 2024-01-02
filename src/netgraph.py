@@ -72,6 +72,7 @@ class Influx(threading.Thread):
                 except queue.Empty:
                     continue
                 self.write_buffer.append(elem)
+                logging.debug(f"write buffer len: {len(self.write_buffer)} of {self.write_buffer_size}")
 
             except Exception as e:
                 logging.exception("Some Exception occured, keep running")
