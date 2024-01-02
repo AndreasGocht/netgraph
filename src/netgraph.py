@@ -186,7 +186,7 @@ def main():
     database.start()
 
     logging.info("Configuring netgraph")
-    sample_rate = datetime.timedelta(milliseconds=config.get("net_graph", "sampling_rate_ms", fallback=100))
+    sample_rate = datetime.timedelta(milliseconds=config.getint("net_graph", "sampling_rate_ms", fallback=100))
     net_graph_data = NetGraphData(database, devices, geo_database, sample_rate)
     net_graph_pcap = NetGraphPcap(database, sample_rate)
 
