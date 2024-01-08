@@ -117,6 +117,7 @@ class NetGraphData(metaclass=Singleton):
         logging.info(f"set pcap_to_ms (sampling rate) to {self.pcap_to_ms} ms")
         self.devices = devices
         self.geo = geo_data.GeoData(geo_database)
+        nethogs.nethogs_enable_udp(True)
 
     def callback(self, action: int, record: nethogs.NethogsMonitorRecord) -> None:
         time = datetime.datetime.utcnow()
