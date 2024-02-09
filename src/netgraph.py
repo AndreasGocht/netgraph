@@ -7,6 +7,7 @@ import logging
 import datetime
 import queue
 import time
+import socket
 
 import geo_data
 import regular_timer
@@ -86,6 +87,7 @@ class NetGraphPcap(regular_timer.RegularTimer, metaclass=Singleton):
         
         self.database = database
         self.last_reported = nethogs.nethogs_packet_stats()
+        self.hostname = socket.getfqdn()
 
     def update(self):
         logging.debug("doing update")
@@ -98,6 +100,7 @@ class NetGraphPcap(regular_timer.RegularTimer, metaclass=Singleton):
                 continue
             p = influxdb_client.Point("packet_stats")
             p.tag("device_name", current.devicename)
+            p.tag("hostname", self.hostname)
             p.field("ps_recv", current.ps_recv - last.ps_recv)
             p.field("ps_drop", current.ps_drop - last.ps_drop)
             p.field("ps_ifdrop", current.ps_ifdrop - last.ps_ifdrop)
@@ -118,6 +121,7 @@ class NetGraphData(metaclass=Singleton):
         self.devices = devices
         self.geo = geo_data.GeoData(geo_database)
         nethogs.nethogs_enable_udp(True)
+        self.hostname = socket.getfqdn()
 
     def callback(self, action: int, record: nethogs.NethogsMonitorRecord) -> None:
         time = datetime.datetime.utcnow()
@@ -131,6 +135,7 @@ class NetGraphData(metaclass=Singleton):
         p.tag("name", name)
         p.tag("uid", record.uid)
         p.tag("device_name", record.device_name)
+        p.tag("hostname", self.hostname)
         p.field("pid", record.pid)
         p.field("sent_bytes", record.sent_bytes)
         p.field("recv_bytes", record.recv_bytes)
